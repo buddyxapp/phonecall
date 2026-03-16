@@ -14,7 +14,6 @@ Iris 是獨立角色，對外自稱「宜安的助理」。詳見 [references/ir
 ## 打電話的完整流程
 
 Cloudflare tunnel 和 port-forward 已常駐在 host（systemd），你不需要管。
-你只需要做以下三件事：
 
 ### 1. 啟動 WS server
 
@@ -23,11 +22,7 @@ nohup node skills/phone-call/scripts/interactive_ws.cjs > /tmp/ws-server.log 2>&
 echo $!
 ```
 
-等 1-2 秒後確認啟動：
-```bash
-cat /tmp/ws-server.log
-```
-應該看到 `[voice] Ready on port 3456`。
+等 2 秒後確認：`cat /tmp/ws-server.log`，應看到 `[voice] Ready on port 3456`。
 
 ### 2. 撥號
 
@@ -44,43 +39,44 @@ const call = await client.calls.create({
 console.log('Call SID:', call.sid);
 ```
 
-撥號後 Iris 會自動打招呼。
+### 3. 對話循環（重要！）
 
-### 3. 監控對話並回應
+撥號後，你必須持續 poll 並回應。使用 bridge helper：
 
-對方說的話會即時轉成文字，出現在 `skills/phone-call/bridge/request_<id>.json`。
-
-Polling 範例：
-```javascript
-const fs = require('fs');
-const path = require('path');
-const BRIDGE = '/home/node/.openclaw/workspace/skills/phone-call/bridge';
-const seen = new Set();
-
-const poll = setInterval(() => {
-  for (const f of fs.readdirSync(BRIDGE).filter(f => f.startsWith('request_') && !seen.has(f))) {
-    seen.add(f);
-    const req = JSON.parse(fs.readFileSync(path.join(BRIDGE, f), 'utf-8'));
-    console.log(`User said: ${req.text}`);
-
-    // ★ 根據對話策略和 Iris 角色決定回應 ★
-    const reply = '你的回應';
-
-    fs.writeFileSync(path.join(BRIDGE, `response_${req.id}.json`), JSON.stringify({ text: reply }));
-  }
-}, 1000);
+```bash
+# 檢查有沒有新的語音訊息
+node skills/phone-call/scripts/bridge.cjs poll
 ```
 
-重要：必須在 45 秒內寫出 response，否則超時。
+- 回傳 `none` → 對方還沒說話，等 2-3 秒後再 poll
+- 回傳 JSON `{"id":1,"text":"對方說的話","timestamp":...}` → 你必須回應：
 
-### 通話結束
+```bash
+# 根據對話策略決定回應，然後：
+node skills/phone-call/scripts/bridge.cjs reply <id> <你的回應文字>
+```
 
-通話結束後停止 WS server：
+**你必須反覆執行 poll → 思考 → reply 這個循環，直到通話結束。**
+每次 poll 到 `none` 就等幾秒再 poll。每次 poll 到訊息就立刻回應。
+回應必須在 45 秒內，否則超時。
+
+範例循環：
+1. `node bridge.cjs poll` → `{"id":1,"text":"你好，請問找誰？"}`
+2. 思考回應（以 Iris 角色）
+3. `node bridge.cjs reply 1 你好，我是宜安的助理芊芊，想請問一下...`
+4. `node bridge.cjs poll` → `none`（等待中）
+5. 等 3 秒
+6. `node bridge.cjs poll` → `{"id":2,"text":"好的，你說"}`
+7. 思考回應
+8. `node bridge.cjs reply 2 ...`
+9. 重複直到任務完成或對方掛斷
+
+### 4. 通話結束
+
+任務完成或對方掛斷後：
 ```bash
 pkill -f interactive_ws.cjs
 ```
-或不管它，10 分鐘無活動會自動退出。
-
 回報通話摘要給用戶。
 
 ## 對話策略
@@ -94,7 +90,7 @@ pkill -f interactive_ws.cjs
 
 ## 備用模式
 
-如果 WS server 啟動失敗（port 被佔等），可用 Record 模式：
+如果 WS server 啟動失敗，可用 Record 模式：
 - `scripts/simple_call.cjs <電話號碼>` — 簡單問答
 - `scripts/interactive_server.cjs` — Record 互動式（延遲較高）
 
