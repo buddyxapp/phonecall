@@ -23,7 +23,7 @@ await client.calls.create({ url: 'https://voice.example.com/voice', to: '<+886..
 ### 3. 監控（可選）
 芊芊自己能聊。只有她問你查資料時才需介入：
 ```bash
-node skills/phone-call/scripts/bridge.cjs poll --wait 30
+node skills/phone-call/scripts/bridge.cjs poll --wait 120
 ```
 收到 JSON 就查資料，然後 `bridge.cjs reply <id> <結果>`。
 

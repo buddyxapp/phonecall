@@ -252,7 +252,7 @@ wss.on("connection", (ws) => {
             processing = true;
             pendingBargeIn = false;
             aborted = false;
-            playRandomFiller(ws, streamSid);
+            if (fullPcm.length > 16000) playRandomFiller(ws, streamSid); // only for longer utterances
             try {
               const text = await transcribe(fullPcm);
               if (text.trim()) {
@@ -337,5 +337,5 @@ setInterval(() => {
   }
 }, 30000);
 
-process.on("SIGTERM", () => process.exit(0));
+process.on("SIGTERM", () => { console.log("[voice] SIGTERM received"); process.exit(0); });
 process.on("SIGINT", () => process.exit(0));
