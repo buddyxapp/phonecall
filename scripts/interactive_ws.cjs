@@ -24,11 +24,18 @@ let lastActivity = Date.now();
 let requestCounter = 0;
 const FILLERS = ["嗯", "對", "好的", "嗯嗯", "啊", "是"];
 let fillerAudio = []; // preloaded mulaw buffers
+let openingText = "";
+let openingAudio = null;
 
 async function preloadFillers() {
   console.log("[voice] Preloading fillers...");
   fillerAudio = await Promise.all(FILLERS.map(f => tts(f)));
   console.log("[voice] Fillers ready:", FILLERS.length);
+  // Pre-generate opening based on task
+  const t0 = Date.now();
+  openingText = await askHaiku([{ role: "user", content: "（電話剛接通，請自我介紹並開場）" }]);
+  openingAudio = await tts(openingText);
+  console.log(`[voice] Opening ready (${Date.now() - t0}ms): ${openingText}`);
 }
 
 function playRandomFiller(ws, streamSid) {
@@ -211,13 +218,9 @@ wss.on("connection", (ws) => {
       if (!greeted) {
         greeted = true;
         try {
-          // Ask Sonnet for a natural opening based on the task
-          const t0 = Date.now();
-          const opening = await askHaiku([{ role: "user", content: "（電話剛接通，請自我介紹並開場）" }]);
-          console.log(`[ws] Opening (${Date.now() - t0}ms): ${opening}`);
-          const audio = await tts(opening);
-          sendAudio(ws, streamSid, audio);
-          history.push({ role: "assistant", content: opening });
+          sendAudio(ws, streamSid, openingAudio);
+          history.push({ role: "assistant", content: openingText });
+          console.log(`[ws] Opening: ${openingText}`);
         } catch (e) { console.error("[ws] greeting error:", e.message); }
       }
     }
