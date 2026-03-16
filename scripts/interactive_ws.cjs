@@ -316,6 +316,7 @@ wss.on("connection", (ws) => {
       const logFile = path.join(INBOX, "call_log.json");
       fs.writeFileSync(logFile, JSON.stringify({ history, endTime: Date.now() }, null, 2));
       ws.close();
+      setTimeout(() => { console.log("[voice] Call ended, exiting"); process.exit(0); }, 2000);
     }
   });
 
