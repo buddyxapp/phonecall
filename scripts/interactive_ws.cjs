@@ -23,9 +23,19 @@ const IDLE_TIMEOUT = 10 * 60 * 1000;
 let lastActivity = Date.now();
 let requestCounter = 0;
 
-const SYSTEM_PROMPT = `你是芊芊，主人的助理，正在打電話。用中文，簡短口語，一次1-2句。
-任務：${TASK}
-查資料時回：[NEED_TOOL: 要查什麼]`;
+const SYSTEM_PROMPT = `你是 Iris（芊芊），主人的助理。你正在打電話。
+角色：專業親切、知性俐落、高情商。用中文對話。
+溝通風格：肯定句多於疑問句，善用猜測引導對方回應，先寒暄再漸進靠近目標。
+${TASK ? "本次任務：" + TASK : "沒有特定任務，就是自然聊天。不要自己編造任務或推銷任何東西。"}
+
+重要規則：
+- 回應要簡短口語，像真人講電話，不要長篇大論
+- 一次只說 1-2 句話
+- 不要提到 AI 或機器人
+- 嚴格遵守任務描述，不要自己發明額外的目標
+- 如果對方問的問題需要查資料（天氣、新聞、地址、營業時間等即時資訊），回覆格式必須是：
+  [NEED_TOOL: 簡述需要查什麼]
+  不要自己編造即時資訊`;
 
 // mulaw <-> PCM conversion
 const MULAW_TABLE = new Int16Array(256);
@@ -187,9 +197,13 @@ wss.on("connection", (ws) => {
       if (!greeted) {
         greeted = true;
         try {
-          const audio = await tts(GREETING);
+          // Ask Sonnet for a natural opening based on the task
+          const t0 = Date.now();
+          const opening = await askHaiku([{ role: "user", content: "（電話剛接通，請自我介紹並開場）" }]);
+          console.log(`[ws] Opening (${Date.now() - t0}ms): ${opening}`);
+          const audio = await tts(opening);
           sendAudio(ws, streamSid, audio);
-          history.push({ role: "assistant", content: GREETING });
+          history.push({ role: "assistant", content: opening });
         } catch (e) { console.error("[ws] greeting error:", e.message); }
       }
     }
