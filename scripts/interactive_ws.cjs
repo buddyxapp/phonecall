@@ -5,10 +5,12 @@ const https = require("https");
 const { WebSocketServer } = require("/tmp/node_modules/ws");
 const { BedrockRuntimeClient, InvokeModelCommand } = require("/tmp/node_modules/@aws-sdk/client-bedrock-runtime");
 const { TranscribeStreamingClient, StartStreamTranscriptionCommand } = require("/tmp/node_modules/@aws-sdk/client-transcribe-streaming");
+const { PollyClient, SynthesizeSpeechCommand } = require("/tmp/node_modules/@aws-sdk/client-polly");
 const fs = require("fs");
 const path = require("path");
 
 const bedrock = new BedrockRuntimeClient({ region: "us-east-1" });
+const polly = new PollyClient({ region: "us-east-1" });
 const INBOX = "/home/node/.openclaw/workspace/skills/phone-call/bridge";
 const AUDIO_DIR = "/tmp/twilio_audio";
 fs.mkdirSync(INBOX, { recursive: true });
@@ -89,29 +91,12 @@ function pcmToMulaw(pcmBuf) {
 }
 
 async function tts(text) {
-  const body = JSON.stringify({ model: "tts-1", input: text, voice: "nova", response_format: "pcm" });
-  const buf = await new Promise((resolve, reject) => {
-    const req = https.request("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + process.env.OPENAI_TTS_KEY,
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(body),
-      },
-    }, (res) => {
-      const chunks = [];
-      res.on("data", c => chunks.push(c));
-      res.on("end", () => res.statusCode === 200 ? resolve(Buffer.concat(chunks)) : reject(new Error(`TTS ${res.statusCode}`)));
-      res.on("error", reject);
-    });
-    req.on("error", reject);
-    req.end(body);
-  });
-  // 24kHz -> 8kHz downsample
-  const samples8 = Math.floor(buf.length / 2 / 3);
-  const pcm8 = Buffer.alloc(samples8 * 2);
-  for (let i = 0; i < samples8; i++) pcm8.writeInt16LE(buf.readInt16LE(i * 6), i * 2);
-  return pcmToMulaw(pcm8);
+  const r = await polly.send(new SynthesizeSpeechCommand({
+    Text: text, OutputFormat: "pcm", SampleRate: "8000", VoiceId: "Zhiyu", Engine: "neural"
+  }));
+  const chunks = [];
+  for await (const chunk of r.AudioStream) chunks.push(chunk);
+  return pcmToMulaw(Buffer.concat(chunks));
 }
 
 function sendAudio(ws, streamSid, mulaw) {
