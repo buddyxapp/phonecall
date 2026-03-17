@@ -76,9 +76,10 @@ Looking for a more human-like calling experience?
 | Natural interruption handling | Basic | ✅ AI understands interrupted context |
 | Voicemail detection | ❌ | ✅ Auto-detect and hang up |
 | Bilingual (Chinese + English) | ❌ | ✅ |
-| Smart call ending | ❌ | ✅ Detects intent to end, wraps up gracefully |
+| Smart call ending | ❌ | ✅ Detects goodbye intent, auto hang-up |
 | No-answer handling | ❌ | ✅ Auto-detect and end call |
-| Auto hang-up after goodbye | ❌ | ✅ Ends call after farewell |
+| Natural wait response | ❌ | ✅ Acknowledges thinking time, no dead air |
+| Multi-segment understanding | ❌ | ✅ Merges fragmented speech for better replies |
 
 ## License
 
